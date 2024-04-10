@@ -13,16 +13,18 @@ public interface FileIO {
    * Reads the file and returns a list of portfolios.
    *
    * @param filePath The path of the file to read
+   * @param type     The type of the portfolio to read
    * @return List of portfolios
    */
-  List<PortfolioInterface> readFile(String filePath) throws IOException;
+  List<PortfolioInterface> readFile(String filePath, String type) throws IOException;
 
   /**
    * Writes to the file.
    *
    * @param portfolio The list of portfolios to write to the file
    * @param filePath  The path of the file to write the portfolios to
+   * @param type      The type of the portfolio to write
    * @return True if the write was successful, false otherwise
    */
-  Boolean writeFile(List<PortfolioInterface> portfolio, String filePath) throws IOException;
+  Boolean writeFile(List<PortfolioInterface> portfolio, String filePath, String type) throws IOException;
 }

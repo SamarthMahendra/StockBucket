@@ -1,22 +1,27 @@
 package view;
 
 
-import model.Tradable;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
+import model.Tradable;
+
 /**
- * View class for the Portfolio Management System.
+ * view class for the Portfolio Management System.
  */
-public class View {
+public class View implements UnifiedViewInterface {
 
   private final Appendable out;
   private Readable in;
 
+  /**
+   * Constructor for the view class.
+   */
   public View() {
     this.out = System.out;
     this.in = new InputStreamReader(System.in);
@@ -29,7 +34,7 @@ public class View {
    * @param message the message to write.
    * @throws IllegalStateException if there is an error in writing.
    */
-  public void writeMessage(String message) throws IllegalStateException {
+  public void inputMessage(String message) throws IllegalStateException {
     try {
       this.out.append(message);
 
@@ -40,16 +45,17 @@ public class View {
 
   /**
    * This method is used for inputStream.
+   *
    * @return the line read from the input stream.
    */
   public String readLine() {
     Scanner scanner = new Scanner(this.in);
-    String line = scanner.nextLine();
-    return line;
+    return scanner.nextLine();
   }
 
   /**
    * This method is used for inputStream.
+   *
    * @return the integer read from the input stream.
    */
   public Integer readInt() {
@@ -61,7 +67,21 @@ public class View {
   }
 
   /**
+   * This method is used for input
+   * @param prompt The prompt to display to the user.
+   * @return the user's input.
+   */
+  @Override
+  public String requestInput(String prompt) {
+    Scanner scanner = new Scanner(this.in);
+    System.out.println(prompt);
+    return scanner.nextLine().trim();
+  }
+
+  /**
    * set the input stream.
+   *
+   * @param in the input stream.
    */
   public void setStreamableInput(Readable in) {
     this.in = in;
@@ -140,8 +160,7 @@ public class View {
    * @param portfolioNames The names of the available portfolios.
    * @throws IOException If an error occurs while writing to the output.
    */
-  public void displayAvailablePortfolios(List<String> portfolioNames)
-      throws IOException {
+  public void displayAvailablePortfolios(List<String> portfolioNames) throws IOException {
     this.out.append("Available portfolios:\n");
     for (String name : portfolioNames) {
       this.out.append(name).append("\n");
@@ -155,8 +174,7 @@ public class View {
    * @param stocks The stocks in the portfolio.
    * @throws IOException If an error occurs while writing to the output.
    */
-  public void displayPortfolioDetails(String name, List<Tradable> stocks)
-      throws IOException {
+  public void displayPortfolioDetails(String name, List<Tradable> stocks) throws IOException {
     this.out.append("Stocks in ").append(name).append(":\n");
     for (Tradable stock : stocks) {
       // display stock name and quantity
@@ -175,11 +193,9 @@ public class View {
    * @param value The value of the portfolio.
    * @throws IOException If an error occurs while writing to the output.
    */
-  public void displayPortfolioValue(String name, String date, String value)
-      throws IOException {
+  public void displayPortfolioValue(String name, String date, String value) throws IOException {
     this.out.append("Value of the portfolio '").append(name).append("' on ").append(date)
-        .append(": ")
-        .append(value).append("\n");
+        .append(": ").append(value).append("\n");
   }
 
   /**
@@ -193,8 +209,7 @@ public class View {
   public void displayPortfolioInvestment(String name, String date, String value)
       throws IOException {
     this.out.append("Investment of the portfolio '").append(name).append("' on ").append(date)
-        .append(": ")
-        .append(value).append("\n");
+        .append(": ").append(value).append("\n");
   }
 
   /**
@@ -203,7 +218,7 @@ public class View {
    * @param filePath The file path where the portfolios were saved.
    * @throws IOException If an error occurs while writing to the output.
    */
-  public void displaySaveSuccess(String filePath, Appendable out) throws IOException {
+  public void displaySaveSuccess(String filePath) throws IOException {
     this.out.append("Portfolios have been saved successfully to ").append(filePath).append("\n");
   }
 
@@ -222,28 +237,62 @@ public class View {
   public void displayStockAdded(String portfolioName, String stockSymbol, int quantity)
       throws IOException {
     this.out.append("Stock ").append(stockSymbol).append(" with quantity ")
-        .append(String.valueOf(quantity))
-        .append(" added to portfolio ").append(portfolioName).append("\n");
+        .append(String.valueOf(quantity)).append(" added to portfolio ").append(portfolioName)
+        .append("\n");
   }
 
   /**
    * Display a success message for selling stocks.
+   *
+   * @param portfolioName The name of the portfolio.
+   * @param symbol        The symbol of the stock.
+   * @param quantity      The quantity of the stock.
    */
   public void displayStockSold(String portfolioName, String symbol, int quantity)
       throws IOException {
     this.out.append("Stock ").append(symbol).append(" with quantity ")
-        .append(String.valueOf(quantity))
-        .append(" sold from portfolio ").append(portfolioName).append("\n");
+        .append(String.valueOf(quantity)).append(" sold from portfolio ").append(portfolioName)
+        .append("\n");
+  }
+
+  /**
+   * Display a message.
+   *
+   * @param message The message to display.
+   */
+  @Override
+  public void displayMessage(String message) {
+    System.out.println(message);
   }
 
   /**
    * Display an error message.
    *
    * @param errorMessage The error message to display.
-   * @throws IOException If an error occurs while writing to the output.
    */
-  public void displayError(String errorMessage) throws IOException {
-    this.out.append("Error: ").append(errorMessage).append("\n");
+  public void displayError(String errorMessage) {
+    inputMessage("Error: " + errorMessage);
+  }
+
+  /**
+   * Request a date from the user.
+   *
+   * @param prompt The prompt to display to the user.
+   * @return The date entered by the user.
+   */
+  @Override
+  public LocalDate requestDate(String prompt) {
+    return null;
+  }
+
+  /**
+   * Display a performance chart to the user.
+   *
+   * @param data The data to display in the chart.
+   */
+  @Override
+  public void displayPerformanceChart(Map<LocalDate, BigDecimal> data) {
+
   }
 
   /**
@@ -255,8 +304,7 @@ public class View {
    * @param dates     The crossover days.
    */
   public void displayCrossoverDays(String symbol, LocalDate startDate, LocalDate endDate,
-      List<LocalDate> dates)
-      throws IOException {
+      List<LocalDate> dates) throws IOException {
     this.out.append("Crossover days for stock ").append(symbol).append(" between ")
         .append(startDate.toString()).append(" and ").append(endDate.toString()).append(":\n");
     for (LocalDate date : dates) {
@@ -275,18 +323,15 @@ public class View {
    * @param result            The moving crossover days.
    */
   public void displayMovingCrossoverDays(String symbol, LocalDate startDate, LocalDate endDate,
-      int shortMovingPeriod, int longMovingPeriod, Map<String, Object> result)
-      throws IOException {
+      int shortMovingPeriod, int longMovingPeriod, Map<String, Object> result) throws IOException {
     List<LocalDate> goldenCrosses = (List<LocalDate>) result.get("goldenCrosses");
     List<LocalDate> deathCrosses = (List<LocalDate>) result.get("deathCrosses");
     List<LocalDate> movingCrossoverDays = (List<LocalDate>) result.get("movingCrossoverDays");
 
     this.out.append("Moving crossover days for stock ").append(symbol).append(" between ")
         .append(startDate.toString()).append(" and ").append(endDate.toString()).append(":\n")
-        .append(
-            "Short moving period: ").append(String.valueOf(shortMovingPeriod))
-        .append(", Long moving period: ")
-        .append(String.valueOf(longMovingPeriod)).append("\n");
+        .append("Short moving period: ").append(String.valueOf(shortMovingPeriod))
+        .append(", Long moving period: ").append(String.valueOf(longMovingPeriod)).append("\n");
     this.out.append("Golden Crosses:\n");
     for (LocalDate goldenDate : goldenCrosses) {
       this.out.append(goldenDate.toString()).append("\n");

@@ -21,6 +21,7 @@ import controller.fileio.CsvFileIO;
 import controller.fileio.FileIO;
 import model.Portfolio;
 import model.PortfolioInterface;
+import model.Tradable;
 import model.utilities.DateUtils;
 
 
@@ -150,6 +151,17 @@ public class PortfolioService implements PortfolioServiceInterface {
   }
 
   /**
+   * Examine the details of a portfolio on a particular date.
+   */
+  public List<Tradable> examinePortfolioDetails(String portfolioName, LocalDate date) {
+    PortfolioInterface portfolio = getPortfolioByName(portfolioName)
+        .orElseThrow(() -> new IllegalArgumentException("Portfolio not found: " + portfolioName));
+    return portfolio.getPortfolio(date);
+
+  }
+
+
+  /**
    * dollar cost averaging for a portfolio.
    */
   public void dollarCostAveraging(String portfolioName, BigDecimal amount, LocalDate startDate, LocalDate endDate, int frequency) {
@@ -264,10 +276,10 @@ public class PortfolioService implements PortfolioServiceInterface {
    *
    * @param filePath The file path to which the portfolios will be saved.
    */
-  public void savePortfoliosToCSV(String filePath) {
+  public void savePortfoliosToCSV(String filePath, String type) {
     FileIO fileio = new CsvFileIO();
     try {
-      fileio.writeFile(portfolios, filePath);
+      fileio.writeFile(portfolios, filePath, type);
     } catch (IOException e) {
       throw new IllegalArgumentException("Error saving portfolios to file: " + e.getMessage());
     }
@@ -280,9 +292,9 @@ public class PortfolioService implements PortfolioServiceInterface {
    * @return Empty string if successful, error message if failed.
    * @throws IOException If an error occurs while reading from the file.
    */
-  public String loadPortfoliosFromCSV(String filePath) throws IOException {
+  public String loadPortfoliosFromCSV(String filePath, String type) throws IOException {
     FileIO fileio = new CsvFileIO();
-    List<PortfolioInterface> loadedPortfolios = fileio.readFile(filePath);
+    List<PortfolioInterface> loadedPortfolios = fileio.readFile(filePath, type);
     portfolios.clear();
     portfolios.addAll(loadedPortfolios);
     return "";

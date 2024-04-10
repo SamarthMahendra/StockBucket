@@ -38,12 +38,12 @@ public interface PortfolioMenuControllerInterface {
   /**
    * Save the portfolio.
    */
-  void savePortfolio();
+  void savePortfolio(String type);
 
   /**
    * Load the portfolio.
    */
-  void loadPortfolio();
+  void loadPortfolio(String type);
 
   /**
    * Load the stock cache.
@@ -74,15 +74,6 @@ public interface PortfolioMenuControllerInterface {
    */
   void computeStockMovingAverage();
 
-  /**
-   * for setting the input stream.
-   */
-  void setStreamableInput(Readable input);
-
-  /**
-   * for getting the output stream.
-   */
-  Appendable getStreamableOutput();
 
   /**
    * adding a stock to the portfolio.

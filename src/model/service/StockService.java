@@ -5,8 +5,6 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,8 +15,10 @@ import java.util.TreeMap;
 import controller.Payload;
 import model.PortfolioInterface;
 import model.Tradable;
+import model.api.ApiSource;
 import model.utilities.StockDataCache;
 import model.utilities.StockInfo;
+import model.api.AlphaVantageApiSource;
 
 import static model.utilities.DateUtils.determineResolution;
 import static model.utilities.DateUtils.getTargetDateBasedOnResolution;
@@ -30,7 +30,7 @@ public class StockService implements StockServiceInterface {
 
   private final StockDataCache cache = new StockDataCache();
 
-  private final String apiKey;
+  private final ApiSource source;
 
   /**
    * Constructor for the StockService class.
@@ -38,7 +38,7 @@ public class StockService implements StockServiceInterface {
    * @param apiKey The API key to use for fetching stock data.
    */
   public StockService(String apiKey) {
-    this.apiKey = apiKey;
+    this.source = new AlphaVantageApiSource(apiKey);
   }
 
   /**
@@ -92,31 +92,9 @@ public class StockService implements StockServiceInterface {
 
       date = date.minusDays(1);
       traverseCount++;
-    }
-    while (traverseCount < 4);
+    } while (traverseCount < 4);
 
     return new Payload(BigDecimal.ZERO, "");
-  }
-
-  /**
-   * Fetches the complete stock data for the given symbol on the given date.
-   *
-   * @param symbol The symbol of the stock.
-   * @param date   The date for which to fetch the stock data.
-   * @return The stock data for the given symbol on the given date.
-   */
-  private StockInfo fetchCompleteStockDataOnDate(String symbol, LocalDate date) {
-    StockInfo info;
-    String message;
-
-    if (!cache.hasStockData(symbol, date)) {
-      message = fetchAndCacheStockData(symbol);
-      if (message != null) {
-        throw new IllegalArgumentException(message);
-      }
-    }
-    info = cache.getStockData(symbol, date);
-    return info;
   }
 
 
@@ -127,7 +105,7 @@ public class StockService implements StockServiceInterface {
    * @return A string containing an error message if the symbol is invalid, or null otherwise.
    */
   private String fetchAndCacheStockData(String symbol) {
-    String csvData = makeApiRequest(symbol);
+    String csvData = this.source.fetchData(symbol);
     if (csvData.contains("Invalid stock symbol")) {
       return "Invalid stock symbol";
     }
@@ -144,10 +122,8 @@ public class StockService implements StockServiceInterface {
   private void parseAndCacheCsvData(String csvData, String symbol) {
     try (BufferedReader reader = new BufferedReader(
         new InputStreamReader(new ByteArrayInputStream(csvData.getBytes())))) {
-      reader.lines()
-          .skip(1) // Skip header
-          .map(line -> line.split(","))
-          .forEach(values -> {
+      reader.lines().skip(1) // Skip header
+          .map(line -> line.split(",")).forEach(values -> {
             LocalDate date = LocalDate.parse(values[0]);
             BigDecimal open = new BigDecimal(values[1]);
             BigDecimal high = new BigDecimal(values[2]);
@@ -162,43 +138,6 @@ public class StockService implements StockServiceInterface {
     }
   }
 
-  /**
-   * Makes an API request to fetch stock data for the given symbol.
-   *
-   * @param symbol The symbol of the stock to fetch data for.
-   * @return A string containing the response from the API.
-   */
-
-  private String makeApiRequest(String symbol) {
-    StringBuilder response = new StringBuilder();
-    try {
-      String urlString = String.format(
-          "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol"
-              + "=%s&datatype=csv&apikey=%s&outputsize=full",
-          symbol, this.apiKey);
-      URL url = new URL(urlString);
-      HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-      connection.setRequestMethod("GET");
-
-      try (BufferedReader reader = new BufferedReader(
-          new InputStreamReader(connection.getInputStream()))) {
-        String line;
-        while ((line = reader.readLine()) != null) {
-          response.append(line).append("\n");
-        }
-      }
-
-      if (response.toString().contains("Error Message")) {
-        System.out.println("Invalid stock symbol: " + symbol);
-        return "Invalid stock symbol: " + symbol;
-      }
-
-    } catch (Exception e) {
-      System.out.println("An error occurred while fetching stock data: " + e.getMessage());
-    }
-    return response.toString();
-  }
-
 
   /**
    * Finds the crossover days for a given stock symbol within a specified date range.
@@ -209,7 +148,7 @@ public class StockService implements StockServiceInterface {
    * @return A list of dates within the specified range that are crossover days.
    */
   public List<LocalDate> findCrossoverDays(String symbol, LocalDate startDate, LocalDate endDate) {
-    // both start and end dates cant be in the future
+    // both start and end dates can't be in the future
     if (startDate.isAfter(LocalDate.now()) || endDate.isAfter(LocalDate.now())) {
       throw new IllegalArgumentException("Date cannot be in the future");
     }
@@ -221,18 +160,35 @@ public class StockService implements StockServiceInterface {
     if (startDate.isEqual(endDate)) {
       throw new IllegalArgumentException("Start date should not be equal to end date");
     }
+
     List<LocalDate> crossoverDays = new ArrayList<>();
-    String csvData = makeApiRequest(symbol);
+    String csvData = this.source.fetchData(symbol);
     if (csvData.contains("Invalid stock symbol")) {
       throw new IllegalArgumentException("Invalid stock symbol: " + symbol);
     }
-    // loop through dates in the range
+
+    // Initialize variables for tracking moving average and previous day's price
+    float movingAverage = 0;
+    float prevClosePrice = 0;
+
+    // Loop through dates in the range
     for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-      StockInfo info = this.fetchCompleteStockDataOnDate(symbol, date);
-      if (info != null && info.getClose().compareTo(info.getOpen()) > 0) {
+      Payload info = this.fetchPriceOnDate(symbol, date);
+      float closePrice = ((BigDecimal)info.getData()).floatValue();
+
+
+      // Calculate the moving average if we have enough data points
+      movingAverage = calculateMovingAverage(symbol, date, 30);
+
+      // Check for a positive crossover (buy signal)
+      if (prevClosePrice < movingAverage && closePrice > movingAverage) {
         crossoverDays.add(date);
       }
+
+      // Update the previous day's close price
+      prevClosePrice = closePrice;
     }
+
     return crossoverDays;
   }
 
@@ -248,29 +204,23 @@ public class StockService implements StockServiceInterface {
    */
   public Map<String, Object> findMovingCrossoverDays(String symbol, LocalDate startDate,
       LocalDate endDate, int shortMovingPeriod, int longMovingPeriod) {
-    // start date should be before end date
+    // Perform input validation
     if (startDate.isAfter(endDate)) {
       throw new IllegalArgumentException("Start date should be before end date");
     }
-    // start != end
     if (startDate.isEqual(endDate)) {
       throw new IllegalArgumentException("Start date should not be equal to end date");
     }
-    // both start and end dates cant be in the future
     if (startDate.isAfter(LocalDate.now()) || endDate.isAfter(LocalDate.now())) {
       throw new IllegalArgumentException("Date cannot be in the future");
     }
-    // short moving period should be less than long moving period
     if (shortMovingPeriod >= longMovingPeriod) {
       throw new IllegalArgumentException(
           "Short moving period should be less than long moving period");
     }
-    // short moving period should be greater than 0
     if (shortMovingPeriod <= 0) {
       throw new IllegalArgumentException("Short moving period should be greater than 0");
     }
-
-    // long moving period should be greater than 0
     if (longMovingPeriod <= 0) {
       throw new IllegalArgumentException("Long moving period should be greater than 0");
     }
@@ -278,33 +228,22 @@ public class StockService implements StockServiceInterface {
     List<LocalDate> goldenCrosses = new ArrayList<>();
     List<LocalDate> deathCrosses = new ArrayList<>();
     List<LocalDate> movingCrossoverDays = new ArrayList<>();
+
     LocalDate currentDate = startDate;
+    boolean isAbove = false;
 
     while (!currentDate.isAfter(endDate)) {
-      LocalDate endShortWindow = currentDate.plusDays(shortMovingPeriod - 1);
-      LocalDate endLongWindow = currentDate.plusDays(longMovingPeriod - 1);
+      float shortMovingAverage = calculateMovingAverage(symbol, currentDate, shortMovingPeriod);
+      float longMovingAverage = calculateMovingAverage(symbol, currentDate, longMovingPeriod);
 
-      // Retrieve historical stock data for the current window
-      List<BigDecimal> closingPrices = getHistoricalData(symbol, currentDate, endShortWindow);
-      List<BigDecimal> longClosingPrices = getHistoricalData(symbol, currentDate, endLongWindow);
-
-      // Calculate the moving averages
-      double shortMovingAvg = calculateMovingAverage(closingPrices, shortMovingPeriod);
-      double longMovingAvg = calculateMovingAverage(longClosingPrices, longMovingPeriod);
-      double prevShortMovingAvg = getPreviousShortMovingAvg(closingPrices, shortMovingPeriod);
-
-      // Check for crossover
-      boolean crossedAbove =
-          shortMovingAvg > longMovingAvg && shortMovingAvg < prevShortMovingAvg;
-      boolean crossedBelow =
-          shortMovingAvg < longMovingAvg && shortMovingAvg > prevShortMovingAvg;
-
-      if (crossedAbove) {
+      if (shortMovingAverage > longMovingAverage && !isAbove) {
         goldenCrosses.add(currentDate);
         movingCrossoverDays.add(currentDate);
-      } else if (crossedBelow) {
+        isAbove = true;
+      } else if (shortMovingAverage < longMovingAverage && isAbove) {
         deathCrosses.add(currentDate);
         movingCrossoverDays.add(currentDate);
+        isAbove = false;
       }
 
       currentDate = currentDate.plusDays(1);
@@ -318,61 +257,21 @@ public class StockService implements StockServiceInterface {
     return result;
   }
 
-  /**
-   * Fetches historical data for a stock symbol within a given date range.
-   *
-   * @param symbol    The stock symbol.
-   * @param startDate The start date of the period.
-   * @param endDate   The end date of the period.
-   * @return A list of closing prices for the stock within the specified date range.
-   */
-  private List<BigDecimal> getHistoricalData(String symbol, LocalDate startDate,
-      LocalDate endDate) {
-    List<BigDecimal> closingPrices = new ArrayList<>();
-    LocalDate currentDate = startDate;
+  private float calculateMovingAverage(String symbol, LocalDate endDate, int period) {
+    LocalDate startDate = endDate.minusDays(period - 1);
+    float sum = 0;
 
-    while (!currentDate.isAfter(endDate)) {
-      StockInfo info = fetchCompleteStockDataOnDate(symbol, currentDate);
-      if (info != null) {
-        closingPrices.add(info.getClose());
+    for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+      Payload info = this.fetchPriceOnDate(symbol, date);
+
+      if (info.getData() == null) {
+        throw new IllegalArgumentException("Invalid stock symbol:" + symbol);
       }
-      currentDate = currentDate.plusDays(1);
+      float closePrice = ((BigDecimal)info.getData()).floatValue();
+      sum += closePrice;
     }
 
-    return closingPrices;
-  }
-
-  /**
-   * Calculates the moving average for a given period.
-   *
-   * @param prices The list of closing prices.
-   * @param period The period for which to calculate the moving average.
-   * @return The moving average.
-   */
-  private double calculateMovingAverage(List<BigDecimal> prices, int period) {
-    BigDecimal sum = BigDecimal.ZERO;
-    for (int i = 0; i < period && i < prices.size(); i++) {
-      sum = sum.add(prices.get(i));
-    }
-    return (Double) sum.divide(BigDecimal.valueOf(period)).doubleValue();
-  }
-
-  /**
-   * Calculates the previous short moving average for a given period.
-   *
-   * @param prices The list of closing prices.
-   * @param period The period for which to calculate the moving average.
-   * @return The previous short moving average.
-   */
-  private double getPreviousShortMovingAvg(List<BigDecimal> prices, int period) {
-    if (prices.size() < period + 1) {
-      return 0; // Not enough data to calculate previous moving average
-    }
-    BigDecimal sum = BigDecimal.ZERO;
-    for (int i = 1; i <= period; i++) {
-      sum = sum.add(prices.get(i));
-    }
-    return (Double) sum.divide(BigDecimal.valueOf(period)).doubleValue();
+    return sum / period;
   }
 
 
@@ -402,7 +301,7 @@ public class StockService implements StockServiceInterface {
    * @param symbol The symbol of the stock to update.
    */
   private void updateCacheWithApiData(String symbol) {
-    String apiResponse = makeApiRequest(symbol); // Your method to fetch data
+    String apiResponse = this.source.fetchData(symbol); // Your method to fetch data
     parseAndCacheCsvData(apiResponse, symbol);
   }
 
@@ -415,8 +314,8 @@ public class StockService implements StockServiceInterface {
    * @param endDate   The end Month of the period.
    * @return A sorted map where keys are dates (end of the month) and values are the closing prices
    */
-  public SortedMap<LocalDate, BigDecimal> fetchMonthlyClosingPricesForPeriod(
-      String symbol, LocalDate startDate, LocalDate endDate) {
+  public SortedMap<LocalDate, BigDecimal> fetchMonthlyClosingPricesForPeriod(String symbol,
+      LocalDate startDate, LocalDate endDate) {
     // Determine resolution based on the period
     String resolution = determineResolution(startDate, endDate);
 
@@ -524,8 +423,7 @@ public class StockService implements StockServiceInterface {
     if (date.isAfter(LocalDate.now())) {
       throw new IllegalArgumentException("Date cannot be in the future");
     }
-    boolean isDataFullyAvailable = isDataAvailableInCache(symbol, date.minusDays(1),
-        date);
+    boolean isDataFullyAvailable = isDataAvailableInCache(symbol, date.minusDays(1), date);
 
     if (!isDataFullyAvailable) {
       // Step 2: Fetch from API and update cache
@@ -560,8 +458,8 @@ public class StockService implements StockServiceInterface {
     int count = 0;
 
     for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-      boolean isDataFullyAvailable =
-          isDataAvailableInCache(symbol, endDate.minusDays(days), endDate);
+      boolean isDataFullyAvailable = isDataAvailableInCache(symbol, endDate.minusDays(days),
+          endDate);
 
       if (!isDataFullyAvailable) {
         // Step 2: Fetch from API and update cache
@@ -575,8 +473,8 @@ public class StockService implements StockServiceInterface {
       }
     }
 
-    return count > 0 ? sum.divide(BigDecimal.valueOf(count), RoundingMode.HALF_UP) :
-        BigDecimal.ZERO;
+    return count > 0 ? sum.divide(BigDecimal.valueOf(count), RoundingMode.HALF_UP)
+        : BigDecimal.ZERO;
   }
 
 }
