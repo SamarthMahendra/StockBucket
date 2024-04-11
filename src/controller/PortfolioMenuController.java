@@ -449,15 +449,16 @@ public class PortfolioMenuController implements PortfolioMenuControllerInterface
     try {
       LocalDate date = LocalDate.parse(dateString);
         if (!date.isBefore(LocalDate.now())) {
-            throw new DateTimeParseException("Date is Null",null,1);
+          throw new Exception("Date is null");
         }
         DayOfWeek dayOfWeek = date.getDayOfWeek();
         if (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY) {
-          throw new DateTimeParseException("Date is Weekend",null,1);
+          throw new Exception("Date is Weekend");
         }
         return LocalDate.parse(dateString);
-    } catch (DateTimeParseException e) {
-      view.displayMessage("Invalid date format. Please try again with format YYYY-MM-DD.");
+    } catch (Exception e) {
+      view.displayMessage("Invalid date format or "+e.getMessage()
+              +" Please try again with format YYYY-MM-DD.");
       return null;
     }
   }
