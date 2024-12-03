@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import model.PortfolioInterface;
+import model.Tradable;
 
 /**
  * Interface for the PortfolioService class.
@@ -82,7 +83,7 @@ public interface PortfolioServiceInterface {
    * @param filePath The file path to which the portfolios will be saved.
    * @throws IOException If an error occurs while writing to the file.
    */
-  void savePortfoliosToCSV(String filePath) throws IOException;
+  void savePortfoliosToCSV(String filePath, String type) throws IOException;
 
   /**
    * Loads portfolios from a CSV file at the given file path.
@@ -91,7 +92,7 @@ public interface PortfolioServiceInterface {
    * @return The file path from which the portfolios were loaded.
    * @throws IOException If an error occurs while reading from the file.
    */
-  String loadPortfoliosFromCSV(String filePath) throws IOException;
+  String loadPortfoliosFromCSV(String filePath, String type) throws IOException;
 
   /**
    * Checks if a portfolio with the given name exists.
@@ -134,7 +135,36 @@ public interface PortfolioServiceInterface {
    */
   StringBuilder plotPerformanceChart(String identifier, LocalDate startDate, LocalDate endDate);
 
-  Map<LocalDate, BigDecimal> plotPerformanceChartGUI(String identifier, LocalDate startDate, LocalDate endDate);
+  /**
+   * Plots a performance chart for a given stock or portfolio over a specified time frame. The
+   * chart
+   *
+   * @param identifier The stock symbol or portfolio name to plot.
+   * @param startDate  The start date of the period to plot.
+   * @param endDate    The end date of the period to plot.
+   * @return A map of LocalDate to BigDecimal representing the value of the stock or portfolio on
+   */
+  Map<LocalDate, BigDecimal> plotPerformanceChartGUI(String identifier, LocalDate startDate,
+      LocalDate endDate);
 
-  void dollarCostAveraging(String portfolioName, BigDecimal amount, LocalDate startDate, LocalDate endDate, int frequency);
+  /**
+   * Invests in a portfolio using the dollar cost averaging strategy.
+   *
+   * @param portfolioName The name of the portfolio to invest in.
+   * @param amount        The amount to invest.
+   * @param startDate     The start date of the investment period.
+   * @param endDate       The end date of the investment period.
+   * @param frequency     The frequency of investment.
+   */
+  void dollarCostAveraging(String portfolioName, BigDecimal amount, LocalDate startDate,
+      LocalDate endDate, int frequency);
+
+  /**
+   * Examine the details of a portfolio on a given date.
+   *
+   * @param portfolioName The name of the portfolio to examine.
+   * @param date          The date to examine the portfolio on.
+   * @return A list of Tradable objects representing the stocks in the portfolio.
+   */
+  List<Tradable> examinePortfolioDetails(String portfolioName, LocalDate date);
 }

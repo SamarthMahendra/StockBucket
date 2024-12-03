@@ -21,6 +21,7 @@ import controller.fileio.CsvFileIO;
 import controller.fileio.FileIO;
 import model.Portfolio;
 import model.PortfolioInterface;
+import model.Tradable;
 import model.utilities.DateUtils;
 
 
@@ -150,14 +151,26 @@ public class PortfolioService implements PortfolioServiceInterface {
   }
 
   /**
+   * Examine the details of a portfolio on a particular date.
+   */
+  public List<Tradable> examinePortfolioDetails(String portfolioName, LocalDate date) {
+    PortfolioInterface portfolio = getPortfolioByName(portfolioName)
+        .orElseThrow(() -> new IllegalArgumentException("Portfolio not found: " + portfolioName));
+    return portfolio.getPortfolio(date);
+
+  }
+
+
+  /**
    * dollar cost averaging for a portfolio.
    */
-  public void dollarCostAveraging(String portfolioName, BigDecimal amount, LocalDate startDate, LocalDate endDate, int frequency) {
+  public void dollarCostAveraging(String portfolioName, BigDecimal amount, LocalDate startDate,
+      LocalDate endDate, int frequency) {
     PortfolioInterface portfolio = getPortfolioByName(portfolioName)
         .orElseThrow(() -> new IllegalArgumentException("Portfolio not found: " + portfolioName));
     portfolio.dollarCostAveraging(amount, startDate, endDate, stockService, frequency);
     return;
-    }
+  }
 
   /**
    * Fetches a portfolio by its name.
@@ -264,10 +277,10 @@ public class PortfolioService implements PortfolioServiceInterface {
    *
    * @param filePath The file path to which the portfolios will be saved.
    */
-  public void savePortfoliosToCSV(String filePath) {
+  public void savePortfoliosToCSV(String filePath, String type) {
     FileIO fileio = new CsvFileIO();
     try {
-      fileio.writeFile(portfolios, filePath);
+      fileio.writeFile(portfolios, filePath, type);
     } catch (IOException e) {
       throw new IllegalArgumentException("Error saving portfolios to file: " + e.getMessage());
     }
@@ -280,9 +293,9 @@ public class PortfolioService implements PortfolioServiceInterface {
    * @return Empty string if successful, error message if failed.
    * @throws IOException If an error occurs while reading from the file.
    */
-  public String loadPortfoliosFromCSV(String filePath) throws IOException {
+  public String loadPortfoliosFromCSV(String filePath, String type) throws IOException {
     FileIO fileio = new CsvFileIO();
-    List<PortfolioInterface> loadedPortfolios = fileio.readFile(filePath);
+    List<PortfolioInterface> loadedPortfolios = fileio.readFile(filePath, type);
     portfolios.clear();
     portfolios.addAll(loadedPortfolios);
     return "";
@@ -415,17 +428,26 @@ public class PortfolioService implements PortfolioServiceInterface {
     }
     return chartBuilder;
   }
-  public Map<LocalDate, BigDecimal>  plotPerformanceChartGUI(String identifier, LocalDate startDate, LocalDate endDate) {
+
+
+  /**
+   * Plots a performance chart for a given stock or portfolio over a specified time frame. The chart
+   * @param identifier The stock symbol or portfolio name to plot.
+   * @param startDate The start date of the period to plot.
+   * @param endDate The end date of the period to plot.
+   * @return A map of dates to total values for the given identifier.
+   */
+  public Map<LocalDate, BigDecimal> plotPerformanceChartGUI(String identifier, LocalDate startDate,
+      LocalDate endDate) {
     Map<LocalDate, BigDecimal> values = portfolioExists(identifier)
-            ? fetchPortfolioValuesForPeriod(identifier, startDate, endDate) :
-            fetchValuesForPeriod(identifier, startDate, endDate);
+        ? fetchPortfolioValuesForPeriod(identifier, startDate, endDate) :
+        fetchValuesForPeriod(identifier, startDate, endDate);
 
     if (values.isEmpty()) {
       System.out.println(
-              "No data available for " + identifier + " from " + startDate + " to " + endDate);
+          "No data available for " + identifier + " from " + startDate + " to " + endDate);
       return null;
     }
-
 
     return values;
   }

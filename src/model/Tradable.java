@@ -38,8 +38,8 @@ public interface Tradable {
   /**
    * Updates the quantity of the tradable asset.
    *
-   * @param quantity The new quantity of the tradable asset.
-   * @param date     The date of the update.
+   * @param quantity     The new quantity of the tradable asset.
+   * @param date         The date of the update.
    * @param sellingPrice The price of the sale.
    */
   void sell(float quantity, LocalDate date, BigDecimal sellingPrice);
@@ -76,6 +76,11 @@ public interface Tradable {
    * @return The activity log of the tradable asset.
    */
   Map<LocalDate, TranactionInfo> getActivityLog();
+
+  /**
+   * to string method for the tradable asset.
+   */
+  String toString();
 
 
 }
